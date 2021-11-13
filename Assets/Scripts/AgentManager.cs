@@ -13,7 +13,7 @@ public class AgentManager : MonoBehaviour
 
     private static List<Agent> agents = new List<Agent>();
     private GameObject agentParent;
-    private Vector3 destination;
+    public Vector3 destination;
 
     public const float UPDATE_RATE = 0.0f;
     private const int PATHFINDING_FRAME_SKIP = 25;

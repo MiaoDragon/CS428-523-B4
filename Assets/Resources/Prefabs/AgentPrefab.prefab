@@ -130,6 +130,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 12450463083bdd140a88af41456e0a5f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  radius: 0.5
+  mass: 10
+  perceptionRadius: 3
+  A: 0
+  B: 1
+  k: 0
+  perceptionR: 0.5
+  speedLimit: 3
+  deltaT: 0.5
 --- !u!54 &928107956113291040
 Rigidbody:
   m_ObjectHideFlags: 0

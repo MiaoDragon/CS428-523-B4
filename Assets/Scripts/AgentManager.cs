@@ -14,7 +14,9 @@ public class AgentManager : MonoBehaviour
     private static List<Agent> agents = new List<Agent>();
     private GameObject agentParent;
     public Vector3 destination;
+    public bool CrowdFollowingScene;
 
+    public float crowdfollow_param;
     public const float UPDATE_RATE = 0.0f;
     private const int PATHFINDING_FRAME_SKIP = 25;
 
@@ -40,6 +42,15 @@ public class AgentManager : MonoBehaviour
             agentScript.radius = 0.3f;// Random.Range(0.2f, 0.6f);
             agentScript.mass = 1;
             agentScript.perceptionRadius = 3;
+            
+            if(CrowdFollowingScene){
+                agentScript.isLeaderFollowingAgent = true;
+                agentScript.forceWeight = 10;
+            }
+            else{
+                agentScript.isLeaderFollowingAgent = false;
+                agentScript.forceWeight = 1;
+            }
 
             agents.Add(agentScript);
             agentsObjs.Add(agent, agentScript);
@@ -101,7 +112,7 @@ public class AgentManager : MonoBehaviour
 
             foreach (var agent in agents)
             {
-                agent.ApplyForce();
+                agent.ApplyForce(crowdfollow_param);
             }
 
             if (UPDATE_RATE == 0)

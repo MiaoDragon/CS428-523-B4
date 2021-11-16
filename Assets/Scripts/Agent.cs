@@ -8,13 +8,16 @@ public class Agent : MonoBehaviour
 {
     public float radius;
     public float mass;
+    public float forceWeight;
     public float perceptionRadius;
+    public bool isLeaderFollowingAgent;
 
     private List<Vector3> path;
     private NavMeshAgent nma;
     private Rigidbody rb;
 
     private HashSet<GameObject> perceivedNeighbors = new HashSet<GameObject>();
+    private List<Vector3> NeighborPaths = new List<Vector3>();
 
     void Start()
     {
@@ -39,8 +42,18 @@ public class Agent : MonoBehaviour
 
             if (path.Count == 0)
             {
-                gameObject.SetActive(false);
-                AgentManager.RemoveAgent(gameObject);
+                if(isLeaderFollowingAgent){
+                    GameObject Lead = GameObject.Find("Agents");
+                    Agent leader = Lead.GetComponentInChildren(typeof(Agent)) as Agent;
+                    if (leader == null){
+                        gameObject.SetActive(false);
+                        AgentManager.RemoveAgent(gameObject);    
+                    }
+                }
+                else{
+                    gameObject.SetActive(false);
+                    AgentManager.RemoveAgent(gameObject);           
+                }
             }
         }
 
@@ -79,12 +92,40 @@ public class Agent : MonoBehaviour
         path = nmPath.corners.Skip(1).ToList();
         //path = new List<Vector3>() { destination };
         //nma.SetDestination(destination);
-        nma.enabled = false;
+        //nma.enabled = false;
     }
 
     public Vector3 GetVelocity()
     {
         return rb.velocity;
+    }
+
+    public Vector3 averageNeighborPath(){
+        Vector3 average = new Vector3();
+        int neighborCount =0;
+        foreach (var agent in perceivedNeighbors){
+            NeighborPaths.Add(agent.GetComponent<Agent>().getPath());
+            neighborCount++;
+        }
+        foreach (var path in NeighborPaths){
+            average += path;
+        }
+        average /= neighborCount;
+        return average;
+    }
+        public bool hasNeighbors(){
+        return perceivedNeighbors.Count() > 3;
+    }
+
+    public Vector3 getPath(){
+            return path[0];
+    }
+
+    public bool hasPath(){
+        if (path.Count > 0){
+            return true;
+        }
+        return false;
     }
 
     #endregion
@@ -105,7 +146,19 @@ public class Agent : MonoBehaviour
             return Vector3.zero;
         }
     }
-    
+     private Vector3 ComputeCFForce(float cfparam)
+    {
+        var force = Vector3.zero;
+        return CalculateCFGoalForce(cfparam) + CalculateAgentForce() + CalculateWallForce();
+        if (force != Vector3.zero)
+        {
+            return force.normalized * Mathf.Min(force.magnitude, Parameters.maxSpeed);
+        } else
+        {
+            return Vector3.zero;
+        }
+    }
+
     private Vector3 CalculateGoalForce()
     {
         if (path.Count() == 0)
@@ -122,9 +175,47 @@ public class Agent : MonoBehaviour
         return force;
     }
 
+    private Vector3 CalculateCFGoalForce(float cfparam){
+        if (path.Count() == 0)
+        {
+            return Vector3.zero;
+        }
+        Vector3 goal = path[0];
+        goal.y = transform.position.y;
+        Vector3 direction = new Vector3();
+        if (hasNeighbors()){
+            direction = ((1-cfparam)*goal + (cfparam*CalculateAverageNeighborForce())) - transform.position;
+        }
+        else{
+            direction = goal - transform.position;
+        }
+        
+        direction = direction / direction.magnitude;
+        
+        float speed = speedLimit;
+        Vector3 force = rb.mass * (speed * direction - GetVelocity()) / Parameters.T;
+        return force;
+    }
+
+        private Vector3 CalculateAverageNeighborForce(){
+        Vector3 average = new Vector3();
+        int count = 0;
+        foreach (var agent in perceivedNeighbors){
+            if (agent.GetComponent<Agent>().hasPath()){
+                average += agent.GetComponent<Agent>().getPath();
+                count++;
+            }
+        }
+        average /= count;
+        return average;
+    }
+
     private Vector3 CalculateAgentForce()
     {
         // find the nearby agents within the radius
+        if(!isLeaderFollowingAgent){
+            return Vector3.zero;
+        }
         Vector3 totalForce = Vector3.zero;
         foreach (var agent in perceivedNeighbors)
         {
@@ -224,12 +315,18 @@ public class Agent : MonoBehaviour
         return totalForce;
     }
 
-    public void ApplyForce()
+    public void ApplyForce(float crowd_param)
     {
         var force = ComputeForce();
-        force.y = 0;
+                if (crowd_param > 0){
+            force = ComputeCFForce(crowd_param);
+            Debug.Log("Calculated cf force: " + force);
+        }
+        else{
+            force = ComputeForce();
+        }
 
-        rb.AddForce(force * 10, ForceMode.Force);
+        rb.AddForce(force * forceWeight, ForceMode.Force);
     }
 
     public void OnTriggerEnter(Collider other)
@@ -242,6 +339,9 @@ public class Agent : MonoBehaviour
         {
             perceivedWalls.Add(other.gameObject);
         }
+         else if(LeaderFollowingAgentManager.IsAgent(other.gameObject)){
+            perceivedNeighbors.Add(other.gameObject);
+        }
     }
     
     public void OnTriggerExit(Collider other)
@@ -253,6 +353,9 @@ public class Agent : MonoBehaviour
         else if (WallManager.IsWall(other.gameObject))
         {
             perceivedWalls.Remove(other.gameObject);
+        }
+         else if(LeaderFollowingAgentManager.IsAgent(other.gameObject)){
+            perceivedNeighbors.Remove(other.gameObject);
         }
     }
 
